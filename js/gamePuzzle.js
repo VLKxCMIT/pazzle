@@ -4,26 +4,24 @@ function GamePuzzle(options) {
     this.mashSizeY = options.mashSizeY ? options.mashSizeY : this.mashSizeY;
     this.puzzleGameContainer = options.puzzleGameContainer ? options.puzzleGameContainer : this.puzzleGameContainer;
     this.puzzleContainer = options.puzzleContainer ? options.puzzleContainer : this.puzzleContainer;
-    this.admission = options.admission ? options.admission : this.admission;
+    this.stickingThreshold = options.stickingThreshold ? options.stickingThreshold : this.stickingThreshold;
 }
 
 GamePuzzle.prototype = {
-    imgUrl: 'img/img1.jpg',
-    mashSizeX: 2,
-    mashSizeY: 2,
+    imgUrl: null,
+    mashSizeX: 1,
+    mashSizeY: 1,
     puzzleGameContainer: '#gamePuzzles',
     puzzleContainer: '#puzzlesBox',
-    admission: 10,
+    stickingThreshold: 10,
 
     previewImgContainer: '#gameCurrentImg',
     puzzleImageWidth: null,
     puzzleImageHeight: null,
     puzzleBoxWidth: null,
     puzzleBoxHeight: null,
-    width: 0,
-    height: 0,
-    currentPuzzleX: 0,
-    currentPuzzleY: 0,
+    puzzleBoxMargin: 15,
+    mainCollection: [],
     constructor: GamePuzzle,
 
     createGame: function () {
@@ -34,7 +32,45 @@ GamePuzzle.prototype = {
             self.calcPreviewImgAndPuzzleBoxSize();
             self.createPuzzlesBox();
             self.slideUpPreviewImg();
+            self.generatePuzzles();
         });
+    },
+
+    generatePuzzles: function () {
+        var self = this;
+        var iX = 0;
+        var iY = 0;
+        var puzzleCollection = [];
+        for (var i = 1; i <= this.mashSizeX * this.mashSizeY; i++) {
+            var puzzleWidth = this.puzzleImageWidth / this.mashSizeX;
+            var puzzleHeight = this.puzzleImageHeight / this.mashSizeY;
+            var puzzle = new Puzzle({
+                container: '#puzzlesBox',
+                puzzle: '.puzzle[data-id=' + i + ']',
+                id: i,
+                x: Math.floor(Math.random() * (this.puzzleBoxWidth - puzzleWidth - 15)) + 15, // depends on puzzle box width
+                y: Math.floor(Math.random() * (this.puzzleBoxHeight - puzzleHeight - this.puzzleBoxMargin)) + this.puzzleBoxMargin,
+                width: puzzleWidth,
+                height: puzzleHeight,
+                backgroundUrl: this.imgUrl,
+                backgroundX: this.puzzleImageWidth / this.mashSizeX * -iX,
+                backgroundY: this.puzzleImageHeight / this.mashSizeY * -iY,
+                mouseUpCallback: function () {
+                    self.coordinateSticking(this);
+                },
+                mouseMoveCallback: function(deltaX, deltaY) {
+                    self.moveCollectionByPuzzleExcludeSelf(this, deltaX, deltaY);
+                }
+            });
+            puzzleCollection[i - 1] = [puzzle];
+            if (iX >= this.mashSizeX - 1) {
+                iX = 0;
+                iY++;
+            } else {
+                iX++;
+            }
+        }
+        this.mainCollection = puzzleCollection;
     },
 
     createPreviewImages: function () {
@@ -54,10 +90,8 @@ GamePuzzle.prototype = {
     calcPreviewImgAndPuzzleBoxSize: function () {
         this.puzzleImageWidth = $(this.previewImgContainer).find('img').width();
         this.puzzleImageHeight = $(this.previewImgContainer).find('img').height();
-        this.puzzleBoxWidth = this.puzzleImageWidth + 100;
-        this.puzzleBoxHeight = this.puzzleImageHeight + 100;
-        this.width = this.puzzleImageWidth / this.mashSizeX;
-        this.height = this.puzzleImageHeight / this.mashSizeY;
+        this.puzzleBoxWidth = $(window).width() - 30; //this.puzzleImageWidth
+        this.puzzleBoxHeight = $(window).height() - 30; //this.puzzleImageHeight
     },
 
     slideUpPreviewImg: function () {
@@ -70,7 +104,7 @@ GamePuzzle.prototype = {
         $(this.puzzleGameContainer).append('<div id="puzzlesBox"></div>');
         $(this.puzzleContainer).css({
             'display': 'block',
-            'margin': '10px auto',
+            'margin': this.puzzleBoxMargin + 'px auto',
             'box-shadow': '0 0 10px 0 brown',
             'font-size': 0,
             'width': this.puzzleBoxWidth,
@@ -80,94 +114,122 @@ GamePuzzle.prototype = {
         });
     },
 
-    coordinateReception: function (currentPuzzle) {
-        this.currentPuzzleX = $('[data-id="' + currentPuzzle.id + '"]').offset().left;
-        this.currentPuzzleY = $('[data-id="' + currentPuzzle.id + '"]').offset().top;
-        this.reception(currentPuzzle);
-    },
-
-    reception: function (currentPuzzle) {
-        if (this.topCheck(currentPuzzle.id)) {
-            var id = currentPuzzle.id - this.mashSizeX;
-            var x = $('[data-id="' + id + '"]').offset().left;
-            var y = $('[data-id="' + id + '"]').offset().top + this.height;
-            currentPuzzle.move(x, y);
-            return;
-        } else if (this.rightCheck(currentPuzzle.id)) {
-            var id = currentPuzzle.id + 1;
-            var x = $('[data-id="' + id + '"]').offset().left - this.width;
-            var y = $('[data-id="' + id + '"]').offset().top;
-            currentPuzzle.move(x, y);
-            return;
-        } else if (this.bottomCheck(currentPuzzle.id)) {
-            var id = currentPuzzle.id + this.mashSizeX;
-            var x = $('[data-id="' + id + '"]').offset().left;
-            var y = $('[data-id="' + id + '"]').offset().top - this.height;
-            currentPuzzle.move(x, y);
-            return;
-        }else if (this.leftCheck(currentPuzzle.id)) {
-            var id = currentPuzzle.id - 1;
-            var x = $('[data-id="' + id + '"]').offset().left + this.width;
-            var y = $('[data-id="' + id + '"]').offset().top;
-            currentPuzzle.move(x, y);
-            return;
+    coordinateSticking: function (puzzle) {
+        var puzzleCollection = this.findPuzzleCollection(puzzle.id);
+        var stickingDelta = this.getStickingDelta(puzzleCollection);
+        if (stickingDelta) {
+            this.moveCollectionByPuzzle(puzzle, stickingDelta.deltaX, stickingDelta.deltaY);
+            this.mergeCollections(stickingDelta.mergeCollection, puzzleCollection);
         }
     },
 
-    topCheck: function (id) {
-        if (this.mashSizeY == 1) {
+    moveCollectionByPuzzle: function(puzzle, deltaX, deltaY) {
+        var puzzleCollection = this.findPuzzleCollection(puzzle.id);
+        this.moveCollection(puzzleCollection, deltaX, deltaY, null);
+    },
+
+    moveCollectionByPuzzleExcludeSelf: function(puzzle, deltaX, deltaY) {
+        var puzzleCollection = this.findPuzzleCollection(puzzle.id);
+        this.moveCollection(puzzleCollection, deltaX, deltaY, puzzle);
+    },
+
+    moveCollection: function (puzzleCollection, deltaX, deltaY, excludePuzzle) {
+        for (var i = 0; i < puzzleCollection.length; i++) {
+            var puzzleItem = puzzleCollection[i];
+            if (excludePuzzle != puzzleItem) {
+                puzzleItem.moveByDelta(deltaX, deltaY);
+            }
+        }
+    },
+
+    getStickingDelta: function (puzzleCollection) {
+        var deltaX, deltaY;
+        for (var i = 0; i < puzzleCollection.length; i++) {
+            var puzzleItem = puzzleCollection[i];
+            for (var j = 0; j < this.mainCollection.length; j++) {
+                var mainCollectionPuzzlesItem = this.mainCollection[j];
+                if (puzzleCollection == mainCollectionPuzzlesItem) {
+                    continue;
+                }
+                for (var k = 0; k < mainCollectionPuzzlesItem.length; k++) {
+                    var puzzleToCompare = mainCollectionPuzzlesItem[k];
+                    if (this.topCheck(puzzleItem, puzzleToCompare)) {
+                        deltaX = puzzleToCompare.x - puzzleItem.x;
+                        deltaY = puzzleToCompare.y - puzzleItem.y + puzzleItem.height;
+                    } else if (this.rightCheck(puzzleItem, puzzleToCompare)) {
+                        deltaX = puzzleToCompare.x - puzzleItem.x - puzzleItem.width;
+                        deltaY = puzzleToCompare.y - puzzleItem.y;
+                    } else if (this.bottomCheck(puzzleItem, puzzleToCompare)) {
+                        deltaX = puzzleToCompare.x - puzzleItem.x;
+                        deltaY = puzzleToCompare.y - puzzleItem.y - puzzleItem.height;
+                    } else if (this.leftCheck(puzzleItem, puzzleToCompare)) {
+                        deltaX = puzzleToCompare.x - puzzleItem.x + puzzleItem.width;
+                        deltaY = puzzleToCompare.y - puzzleItem.y;
+                    }
+                    if (deltaX && deltaY) {
+                        return { deltaX: deltaX, deltaY: deltaY, mergeCollection: mainCollectionPuzzlesItem };
+                    }
+                }
+            }
+        }
+        return null;
+    },
+
+    mergeCollections: function (target, source) {
+        this.mainCollection.splice(this.mainCollection.indexOf(source), 1);
+        Array.prototype.push.apply(target, source);
+        this.winningCheck();
+    },
+
+    findPuzzleCollection: function(puzzleId) {
+        for (var i = 0; i < this.mainCollection.length; i++) {
+            var mainPuzzleCollection = this.mainCollection[i];
+            for (var j = 0; j < mainPuzzleCollection.length; j++) {
+                if (mainPuzzleCollection[j].id == puzzleId) {
+                    return mainPuzzleCollection;
+                }
+            }
+        }
+    },
+
+    winningCheck: function () {
+        if (this.mainCollection.length == 1) {
+            $('#puzzlesBox').css({
+                'box-shadow': '0 0 30px 0 green'
+            });
+            alert('You WIN!');
+        }
+    },
+
+    topCheck: function (puzzle, puzzleToCompare) {
+        if (this.mashSizeY == 1 || puzzle.id - this.mashSizeX != puzzleToCompare.id) {
             return false;
         }
-        var index = id - this.mashSizeX;
-        if (index > 0) {
-            var x = $('[data-id="' + index + '"]').offset().left;
-            var y = $('[data-id="' + index + '"]').offset().top;
-            return  Math.abs(x - this.currentPuzzleX) < this.admission &&
-                    Math.abs(y + this.height - this.currentPuzzleY) < this.admission;
-        }
-        return false;
+        return  Math.abs(puzzleToCompare.x - puzzle.x) < this.stickingThreshold &&
+                Math.abs(puzzleToCompare.y + puzzle.height - puzzle.y) < this.stickingThreshold;
     },
 
-    rightCheck: function (id) {
-        if (this.mashSizeX == 1) {
+    rightCheck: function (puzzle, puzzleToCompare) {
+        if (this.mashSizeX == 1 || puzzle.id % this.mashSizeX == 0 || puzzle.id + 1 != puzzleToCompare.id) {
             return false;
         }
-        if (id % this.mashSizeX > 0) {
-            var index = id + 1;
-            var x = $('[data-id="' + index + '"]').offset().left;
-            var y = $('[data-id="' + index + '"]').offset().top;
-            return  Math.abs(this.currentPuzzleX + this.width - x) < this.admission &&
-                    Math.abs(this.currentPuzzleY - y) < this.admission;
-        }
-        return false;
+        return  Math.abs(puzzle.x + puzzle.width - puzzleToCompare.x) < this.stickingThreshold &&
+                Math.abs(puzzle.y - puzzleToCompare.y) < this.stickingThreshold;
     },
 
-    bottomCheck: function (id) {
-        if (this.mashSizeY == 1) {
+    bottomCheck: function (puzzle, puzzleToCompare) {
+        if (this.mashSizeY == 1 || puzzle.id + this.mashSizeX != puzzleToCompare.id) {
             return false;
         }
-        var index = id + this.mashSizeX;
-        if (index <= this.mashSizeX * this.mashSizeY) {
-            var x = $('[data-id="' + index + '"]').offset().left;
-            var y = $('[data-id="' + index + '"]').offset().top;
-            return  Math.abs(x - this.currentPuzzleX) < this.admission &&
-                    Math.abs(y - this.currentPuzzleY - this.height) < this.admission;
-        }
-        return false;
+        return  Math.abs(puzzleToCompare.x - puzzle.x) < this.stickingThreshold &&
+                Math.abs(puzzleToCompare.y - puzzle.y - puzzle.height) < this.stickingThreshold;
     },
 
-    leftCheck: function (id) {
-        if (this.mashSizeX == 1) {
+    leftCheck: function (puzzle, puzzleToCompare) {
+        if (this.mashSizeX == 1 || puzzle.id % this.mashSizeX == 1 || puzzle.id - 1 != puzzleToCompare.id) {
             return false;
         }
-        var rowIndex = id % this.mashSizeX;
-        if (rowIndex == 0 || rowIndex > 1) {
-            var index = id - 1;
-            var x = $('[data-id="' + index + '"]').offset().left;
-            var y = $('[data-id="' + index + '"]').offset().top;
-            return  Math.abs(this.currentPuzzleX - this.width - x) < this.admission &&
-                    Math.abs(this.currentPuzzleY - y) < this.admission;
-        }
-        return false;
+        return  Math.abs(puzzle.x - puzzle.width - puzzleToCompare.x) < this.stickingThreshold &&
+                Math.abs(puzzle.y - puzzleToCompare.y) < this.stickingThreshold;
     }
 };

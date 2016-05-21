@@ -9,7 +9,8 @@ function Puzzle(params) {
     this.backgroundUrl = params.backgroundUrl ? params.backgroundUrl : this.backgroundUrl;
     this.backgroundX = params.backgroundX ? params.backgroundX : this.backgroundX;
     this.backgroundY = params.backgroundY ? params.backgroundY : this.backgroundY;
-    this.callback = params.callback ? params.callback : null;
+    this.mouseUpCallback = params.mouseUpCallback ? params.mouseUpCallback : null;
+    this.mouseMoveCallback = params.mouseMoveCallback ? params.mouseMoveCallback : null;
 
     // init puzzle
     this.init();
@@ -32,7 +33,10 @@ Puzzle.prototype = {
     isMouseDown: false,
     whereMouseInPuzzleDownX: null,
     whereMouseInPuzzleDownY: null,
-    callback: null,
+    mouseUpCallback: null,
+    mouseMoveCallback: null,
+    lastPositionX: 0,
+    lastPositionY: 0,
 
     constructor: Puzzle,
 
@@ -40,32 +44,41 @@ Puzzle.prototype = {
         var self = this;
         this.puzzle = this.puzzle.replace('{dataId}', this.id.toString());
         this.template = this.template.replace('{id}', this.id.toString());
-        this.x = $(this.container).offset().left;
-        this.y = $(this.container).offset().top;
         this.render();
+        this.lastPositionX = $(this.puzzle).offset().left;
+        this.lastPositionY = $(this.puzzle).offset().top;
 
         $(this.puzzle).on('mouseenter', function () {
-            self.puzzleMouseEnter();
+            self.animatePuzzleMouseEnter();
         });
 
         $(this.puzzle).on('mouseleave', function () {
-            self.puzzleMouseOut();
+            self.animatePuzzleMouseOut();
         });
 
         $(this.puzzle).on('mousedown', function (e) {
-            self.isMouseDown = true;
-            self.whereMouseInPuzzleDownX = e.pageX - self.x;
-            self.whereMouseInPuzzleDownY = e.pageY - self.y;
-            self.puzzleMouseDown();
+            if ($(e.target).data('id') == self.id) {
+                self.isMouseDown = true;
+                self.whereMouseInPuzzleDownX = e.pageX - self.x;
+                self.whereMouseInPuzzleDownY = e.pageY - self.y;
+                self.lastPositionX = $(self.puzzle).offset().left;
+                self.lastPositionY = $(self.puzzle).offset().top;
+                self.animatePuzzleMouseDown();
+            }
         });
 
-        $(this.puzzle).on('mouseup', function () {
-            self.isMouseDown = false;
-            self.puzzleMouseUp();
+        $(this.container).on('mouseup', function () {
+            if (self.isMouseDown) {
+                self.isMouseDown = false;
+                self.animatePuzzleMouseUp();
+                if (self.mouseUpCallback) {
+                    self.mouseUpCallback.call(self);
+                }
+            }
         });
 
-        $(this.puzzle).on('mousemove', function (e) {
-            if (self.isMouseDown && $(e.target).data('id') == self.id) {
+        $(this.container).on('mousemove', function (e) {
+            if (self.isMouseDown) {
                 self.puzzleMove(e.pageX, e.pageY);
             }
         });
@@ -92,7 +105,7 @@ Puzzle.prototype = {
         });
     },
 
-    puzzleMouseEnter: function () {
+    animatePuzzleMouseEnter: function () {
         $(this.puzzle).css({
             'box-shadow': '0 0 3px 0 red',
             'color': 'brown',
@@ -101,7 +114,7 @@ Puzzle.prototype = {
         });
     },
 
-    puzzleMouseOut: function () {
+    animatePuzzleMouseOut: function () {
         $(this.puzzle).css({
             'box-shadow': '0 0 3px 0 brown',
             'color': 'red',
@@ -110,7 +123,7 @@ Puzzle.prototype = {
         });
     },
 
-    puzzleMouseDown: function () {
+    animatePuzzleMouseDown: function () {
         $(this.puzzle).css({
             'box-shadow': '0 0 3px 0 green',
             'cursor': 'move',
@@ -118,21 +131,21 @@ Puzzle.prototype = {
         });
     },
 
-    puzzleMouseUp: function () {
+    animatePuzzleMouseUp: function () {
         $(this.puzzle).css({
             'box-shadow': '0 0 3px 0 brown',
             'cursor': 'pointer',
             'opacity': 1
         });
-        if (this.callback) {
-            this.callback.call(this);
-        }
     },
 
     puzzleMove: function (x, y) {
         var x = x - this.whereMouseInPuzzleDownX;
         var y = y - this.whereMouseInPuzzleDownY;
-        this.move(x, y);
+        var delta = this.move(x, y);
+        if (this.mouseMoveCallback) {
+            this.mouseMoveCallback.call(this, -delta.x, -delta.y);
+        }
     },
 
     move: function (x, y) {
@@ -142,5 +155,14 @@ Puzzle.prototype = {
             'left': this.x + 'px',
             'top': this.y + 'px'
         });
+        var deltaX = this.lastPositionX - x;
+        var deltaY = this.lastPositionY - y;
+        this.lastPositionX = x;
+        this.lastPositionY = y;
+        return { x: deltaX, y: deltaY };
+    },
+
+    moveByDelta: function(deltaX, deltaY) {
+        this.move(this.x + deltaX, this.y + deltaY);
     }
 };
