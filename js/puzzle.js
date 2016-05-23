@@ -9,6 +9,7 @@ function Puzzle(params) {
     this.backgroundUrl = params.backgroundUrl ? params.backgroundUrl : this.backgroundUrl;
     this.backgroundX = params.backgroundX ? params.backgroundX : this.backgroundX;
     this.backgroundY = params.backgroundY ? params.backgroundY : this.backgroundY;
+    this.mouseDownCallback = params.mouseDownCallback ? params.mouseDownCallback : null;
     this.mouseUpCallback = params.mouseUpCallback ? params.mouseUpCallback : null;
     this.mouseMoveCallback = params.mouseMoveCallback ? params.mouseMoveCallback : null;
 
@@ -31,8 +32,9 @@ Puzzle.prototype = {
 
     template: '<div class="puzzle" data-id="{id}"></div>',
     isMouseDown: false,
-    whereMouseInPuzzleDownX: null,
-    whereMouseInPuzzleDownY: null,
+    whereMouseInPuzzleDownX: 0,
+    whereMouseInPuzzleDownY: 0,
+    mouseDownCallback: null,
     mouseUpCallback: null,
     mouseMoveCallback: null,
     lastPositionX: 0,
@@ -64,6 +66,9 @@ Puzzle.prototype = {
                 self.lastPositionX = $(self.puzzle).offset().left;
                 self.lastPositionY = $(self.puzzle).offset().top;
                 self.animatePuzzleMouseDown();
+                if (self.mouseDownCallback) {
+                    self.mouseDownCallback.call(self);
+                }
             }
         });
 

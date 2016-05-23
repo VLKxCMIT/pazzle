@@ -5,6 +5,7 @@ function GamePuzzle(options) {
     this.puzzleGameContainer = options.puzzleGameContainer ? options.puzzleGameContainer : this.puzzleGameContainer;
     this.puzzleContainer = options.puzzleContainer ? options.puzzleContainer : this.puzzleContainer;
     this.stickingThreshold = options.stickingThreshold ? options.stickingThreshold : this.stickingThreshold;
+    this.memento = options.memento ? options.memento : null;
 }
 
 GamePuzzle.prototype = {
@@ -14,6 +15,7 @@ GamePuzzle.prototype = {
     puzzleGameContainer: '#gamePuzzles',
     puzzleContainer: '#puzzlesBox',
     stickingThreshold: 10,
+    memento: null,
 
     previewImgContainer: '#gameCurrentImg',
     puzzleImageWidth: null,
@@ -28,15 +30,47 @@ GamePuzzle.prototype = {
         this.createPreviewImages();
         var self = this;
         $(this.previewImgContainer).find('img').load(function () {
-            // render control buttons
             self.calcPreviewImgAndPuzzleBoxSize();
             self.createPuzzlesBox();
             self.slideUpPreviewImg();
-            self.generatePuzzles();
+            self.mainCollection = self.generatePuzzlesCollection();
+            self.initGameControls();
         });
     },
 
-    generatePuzzles: function () {
+    initGameControls: function () {
+        // buttons...
+        this.initUndoFeature();
+    },
+
+    initUndoFeature: function () {
+        var self = this;
+        $(document).keydown(function(e){
+            e = e || window.event;
+            if ((e.which == 90 || e.keyCode == 90) && e.ctrlKey) {
+                self.restoreState();
+                console.log('state restored');
+            }
+        });
+    },
+
+    restoreState: function () {
+        if (this.memento) {
+            var state = this.memento.getState();
+            if (state) {
+                this.clearContainer();
+                this.mainCollection = this.generatePuzzlesCollectionByState(state);
+            }
+        }
+    },
+
+    saveState: function () {
+        if (this.memento) {
+            this.memento.setState(this.mainCollection);
+        }
+    },
+
+    generatePuzzlesCollection: function () {
         var self = this;
         var iX = 0;
         var iY = 0;
@@ -55,10 +89,13 @@ GamePuzzle.prototype = {
                 backgroundUrl: this.imgUrl,
                 backgroundX: this.puzzleImageWidth / this.mashSizeX * -iX,
                 backgroundY: this.puzzleImageHeight / this.mashSizeY * -iY,
+                mouseDownCallback: function() {
+                    self.saveState();
+                },
                 mouseUpCallback: function () {
                     self.coordinateSticking(this);
                 },
-                mouseMoveCallback: function(deltaX, deltaY) {
+                mouseMoveCallback: function (deltaX, deltaY) {
                     self.moveCollectionByPuzzleExcludeSelf(this, deltaX, deltaY);
                 }
             });
@@ -70,7 +107,46 @@ GamePuzzle.prototype = {
                 iX++;
             }
         }
-        this.mainCollection = puzzleCollection;
+        return puzzleCollection;
+    },
+
+    generatePuzzlesCollectionByState: function (state) {
+        var self = this;
+        var puzzleCollection = [];
+        for (var i = 0; i < state.length; i++) {
+            var mainCollectionPuzzles = [];
+            var statePuzzles = state[i];
+            for (var j = 0; j < statePuzzles.length; j++) {
+                var puzzle = new Puzzle({
+                    container: statePuzzles[j].container,
+                    puzzle: statePuzzles[j].puzzle,
+                    id: statePuzzles[j].id,
+                    x: statePuzzles[j].x,
+                    y: statePuzzles[j].y,
+                    width: statePuzzles[j].width,
+                    height: statePuzzles[j].height,
+                    backgroundUrl: statePuzzles[j].backgroundUrl,
+                    backgroundX: statePuzzles[j].backgroundX,
+                    backgroundY: statePuzzles[j].backgroundY,
+                    mouseDownCallback: function() {
+                        self.saveState();
+                    },
+                    mouseUpCallback: function () {
+                        self.coordinateSticking(this);
+                    },
+                    mouseMoveCallback: function (deltaX, deltaY) {
+                        self.moveCollectionByPuzzleExcludeSelf(this, deltaX, deltaY);
+                    }
+                });
+                mainCollectionPuzzles.push(puzzle);
+            }
+            puzzleCollection.push(mainCollectionPuzzles);
+        }
+        return puzzleCollection;
+    },
+
+    clearContainer: function() {
+        $(this.puzzleContainer).empty();
     },
 
     createPreviewImages: function () {
@@ -123,12 +199,12 @@ GamePuzzle.prototype = {
         }
     },
 
-    moveCollectionByPuzzle: function(puzzle, deltaX, deltaY) {
+    moveCollectionByPuzzle: function (puzzle, deltaX, deltaY) {
         var puzzleCollection = this.findPuzzleCollection(puzzle.id);
         this.moveCollection(puzzleCollection, deltaX, deltaY, null);
     },
 
-    moveCollectionByPuzzleExcludeSelf: function(puzzle, deltaX, deltaY) {
+    moveCollectionByPuzzleExcludeSelf: function (puzzle, deltaX, deltaY) {
         var puzzleCollection = this.findPuzzleCollection(puzzle.id);
         this.moveCollection(puzzleCollection, deltaX, deltaY, puzzle);
     },
@@ -167,7 +243,7 @@ GamePuzzle.prototype = {
                         deltaY = puzzleToCompare.y - puzzleItem.y;
                     }
                     if (deltaX && deltaY) {
-                        return { deltaX: deltaX, deltaY: deltaY, mergeCollection: mainCollectionPuzzlesItem };
+                        return {deltaX: deltaX, deltaY: deltaY, mergeCollection: mainCollectionPuzzlesItem};
                     }
                 }
             }
@@ -181,7 +257,7 @@ GamePuzzle.prototype = {
         this.winningCheck();
     },
 
-    findPuzzleCollection: function(puzzleId) {
+    findPuzzleCollection: function (puzzleId) {
         for (var i = 0; i < this.mainCollection.length; i++) {
             var mainPuzzleCollection = this.mainCollection[i];
             for (var j = 0; j < mainPuzzleCollection.length; j++) {
@@ -205,31 +281,31 @@ GamePuzzle.prototype = {
         if (this.mashSizeY == 1 || puzzle.id - this.mashSizeX != puzzleToCompare.id) {
             return false;
         }
-        return  Math.abs(puzzleToCompare.x - puzzle.x) < this.stickingThreshold &&
-                Math.abs(puzzleToCompare.y + puzzle.height - puzzle.y) < this.stickingThreshold;
+        return Math.abs(puzzleToCompare.x - puzzle.x) < this.stickingThreshold &&
+            Math.abs(puzzleToCompare.y + puzzle.height - puzzle.y) < this.stickingThreshold;
     },
 
     rightCheck: function (puzzle, puzzleToCompare) {
         if (this.mashSizeX == 1 || puzzle.id % this.mashSizeX == 0 || puzzle.id + 1 != puzzleToCompare.id) {
             return false;
         }
-        return  Math.abs(puzzle.x + puzzle.width - puzzleToCompare.x) < this.stickingThreshold &&
-                Math.abs(puzzle.y - puzzleToCompare.y) < this.stickingThreshold;
+        return Math.abs(puzzle.x + puzzle.width - puzzleToCompare.x) < this.stickingThreshold &&
+            Math.abs(puzzle.y - puzzleToCompare.y) < this.stickingThreshold;
     },
 
     bottomCheck: function (puzzle, puzzleToCompare) {
         if (this.mashSizeY == 1 || puzzle.id + this.mashSizeX != puzzleToCompare.id) {
             return false;
         }
-        return  Math.abs(puzzleToCompare.x - puzzle.x) < this.stickingThreshold &&
-                Math.abs(puzzleToCompare.y - puzzle.y - puzzle.height) < this.stickingThreshold;
+        return Math.abs(puzzleToCompare.x - puzzle.x) < this.stickingThreshold &&
+            Math.abs(puzzleToCompare.y - puzzle.y - puzzle.height) < this.stickingThreshold;
     },
 
     leftCheck: function (puzzle, puzzleToCompare) {
         if (this.mashSizeX == 1 || puzzle.id % this.mashSizeX == 1 || puzzle.id - 1 != puzzleToCompare.id) {
             return false;
         }
-        return  Math.abs(puzzle.x - puzzle.width - puzzleToCompare.x) < this.stickingThreshold &&
-                Math.abs(puzzle.y - puzzleToCompare.y) < this.stickingThreshold;
+        return Math.abs(puzzle.x - puzzle.width - puzzleToCompare.x) < this.stickingThreshold &&
+            Math.abs(puzzle.y - puzzleToCompare.y) < this.stickingThreshold;
     }
 };
