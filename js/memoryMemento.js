@@ -1,5 +1,4 @@
 function MemoryMemento() {
-
 }
 
 MemoryMemento.prototype = {
