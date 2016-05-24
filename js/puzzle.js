@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 define(['jquery'], function($) {
     function Puzzle(params) {
         this.container = params.container ? params.container : this.container;
@@ -71,6 +72,88 @@ define(['jquery'], function($) {
                     if (self.mouseDownCallback) {
                         self.mouseDownCallback.call(self);
                     }
+=======
+function Puzzle(params) {
+    this.container = params.container ? params.container : this.container;
+    this.puzzle = params.puzzle ? params.puzzle : this.puzzle;
+    this.id = params.id ? params.id : this.id;
+    this.x = params.x ? params.x : this.x;
+    this.y = params.y ? params.y : this.y;
+    this.width = params.width ? params.width : this.width;
+    this.height = params.height ? params.height : this.height;
+    this.backgroundUrl = params.backgroundUrl ? params.backgroundUrl : this.backgroundUrl;
+    this.backgroundX = params.backgroundX ? params.backgroundX : this.backgroundX;
+    this.backgroundY = params.backgroundY ? params.backgroundY : this.backgroundY;
+    this.mouseDownCallback = params.mouseDownCallback ? params.mouseDownCallback : null;
+    this.mouseUpCallback = params.mouseUpCallback ? params.mouseUpCallback : null;
+    this.mouseMoveCallback = params.mouseMoveCallback ? params.mouseMoveCallback : null;
+
+    // init puzzle
+    this.init();
+}
+
+Puzzle.prototype = {
+
+    container: '#puzzlesBox',
+    puzzle: '.puzzle[data-id={dataId}]',
+    id: 0,
+    x: 0,
+    y: 0,
+    width: null,
+    height: null,
+    backgroundUrl: 'img/img1.jpg',
+    backgroundX: 0,
+    backgroundY: 0,
+
+    template: '<div class="puzzle" data-id="{id}"></div>',
+    isMouseDown: false,
+    whereMouseInPuzzleDownX: 0,
+    whereMouseInPuzzleDownY: 0,
+    mouseDownCallback: null,
+    mouseUpCallback: null,
+    mouseMoveCallback: null,
+    lastPositionX: 0,
+    lastPositionY: 0,
+
+    constructor: Puzzle,
+
+    init: function () {
+        var self = this;
+        this.puzzle = this.puzzle.replace('{dataId}', this.id.toString());
+        this.template = this.template.replace('{id}', this.id.toString());
+        this.render();
+        this.lastPositionX = $(this.puzzle).offset().left;
+        this.lastPositionY = $(this.puzzle).offset().top;
+
+        $(this.puzzle).on('mouseenter', function () {
+            self.animatePuzzleMouseEnter();
+        });
+
+        $(this.puzzle).on('mouseleave', function () {
+            self.animatePuzzleMouseOut();
+        });
+
+        $(this.puzzle).on('mousedown', function (e) {
+            if ($(e.target).data('id') == self.id) {
+                self.isMouseDown = true;
+                self.whereMouseInPuzzleDownX = e.pageX - self.x;
+                self.whereMouseInPuzzleDownY = e.pageY - self.y;
+                self.lastPositionX = $(self.puzzle).offset().left;
+                self.lastPositionY = $(self.puzzle).offset().top;
+                self.animatePuzzleMouseDown();
+                if (self.mouseDownCallback) {
+                    self.mouseDownCallback.call(self);
+                }
+            }
+        });
+
+        $(this.container).on('mouseup', function () {
+            if (self.isMouseDown) {
+                self.isMouseDown = false;
+                self.animatePuzzleMouseUp();
+                if (self.mouseUpCallback) {
+                    self.mouseUpCallback.call(self);
+>>>>>>> Stashed changes
                 }
             });
 
