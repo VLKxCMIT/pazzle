@@ -6,7 +6,7 @@ $(function () {
         puzzleGameContainer: '#gamePuzzles',
         puzzleContainer: '#puzzlesBox',
         stickingThreshold: 70,
-        memento: new CookieMemento()
+        memento: new MemoryMemento()
     });
     gamePuzzle.createGame();
 });
