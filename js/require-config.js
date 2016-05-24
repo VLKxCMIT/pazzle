@@ -4,7 +4,8 @@ requirejs.config({
         jquery: 'jquery-2.2.3',
         gamePuzzle: 'game-puzzle',
         memoryMemento: 'memory-memento',
-        cookieMemento: 'cookie-memento'
+        cookieMemento: 'cookie-memento',
+        backbone: 'backbone'
     }
 });
 
